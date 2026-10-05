@@ -54,4 +54,12 @@ export class AdminService {
   getTrips() {
     return this.http.get<Trip[]>(`${this.api}/trips`);
   }
+
+  getReportedPayments() {
+    return this.http.get<Trip[]>(`${this.api}/payments/reported`);
+  }
+
+  resolvePaymentReport(tripId: string, action: 'paid' | 'dismissed') {
+    return this.http.patch<Trip>(`${this.api}/payments/${tripId}/report`, { action });
+  }
 }

@@ -24,6 +24,38 @@ import { Trip } from '../../../../models';
             <i class="fa-solid fa-triangle-exclamation"></i> {{ error }}
           </div>
         }
+        @if (paymentMessage) {
+          <div class="alert alert-success mb-4">{{ paymentMessage }}</div>
+        }
+
+        <section class="glass-panel mb-4 payment-reports">
+          <h2 class="title" style="font-size:1.25rem;">Reportes de pago pendientes</h2>
+          @if (paymentReportsLoading) {
+            <p class="text-muted mb-0">Cargando reportes...</p>
+          } @else {
+            @for (report of reportedPayments; track report.id) {
+              <article class="payment-report-card">
+                <div class="payment-report-copy">
+                  <strong>{{ report.passenger?.nombre || 'Pasajero' }} · {{ report.driver?.nombre || 'Conductor' }}</strong>
+                  <span>Viaje finalizado · Tarifa: {{ report.fare | currency:'ARS':'symbol':'1.0-0' }}</span>
+                  <span>Método: {{ report.payment_method === 'mercadopago' ? 'Mercado Pago' : 'Efectivo' }}</span>
+                  <p>Motivo informado: {{ report.payment_issue }}</p>
+                  <small>ID de viaje: {{ report.id }}</small>
+                </div>
+                <div class="payment-report-actions">
+                  <button type="button" class="btn btn-success" (click)="resolvePayment(report, 'paid')" [disabled]="resolvingPaymentId === report.id">
+                    Marcar pagado
+                  </button>
+                  <button type="button" class="btn btn-outline" (click)="resolvePayment(report, 'dismissed')" [disabled]="resolvingPaymentId === report.id">
+                    Descartar reporte
+                  </button>
+                </div>
+              </article>
+            } @empty {
+              <p class="text-muted mb-0">No hay reportes de pago pendientes.</p>
+            }
+          }
+        </section>
 
         <!-- Filter Controls -->
         <div class="glass-panel mb-4" style="padding: 1rem 1.5rem;">
@@ -123,6 +155,21 @@ import { Trip } from '../../../../models';
       </main>
     </div>
   `,
+  styles: [`
+    .payment-reports { width: 100%; }
+    .payment-report-card { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 0; border-top: 1px solid var(--glass-border); }
+    .payment-report-copy { display: grid; gap: 0.25rem; overflow-wrap: anywhere; }
+    .payment-report-copy strong { color: #fff; }
+    .payment-report-copy span, .payment-report-copy small { color: var(--text-muted); }
+    .payment-report-copy p { margin: 0.25rem 0; }
+    .payment-report-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+    .payment-report-actions .btn { width: auto; }
+    @media (max-width: 700px) {
+      .payment-report-card { align-items: stretch; flex-direction: column; }
+      .payment-report-actions { justify-content: stretch; }
+      .payment-report-actions .btn { flex: 1; }
+    }
+  `],
 })
 export class AdminTripsComponent implements OnInit {
   private adminService = inject(AdminService);
@@ -133,9 +180,14 @@ export class AdminTripsComponent implements OnInit {
 
   searchTerm = '';
   selectedStatus = '';
+  reportedPayments: Trip[] = [];
+  paymentReportsLoading = true;
+  resolvingPaymentId: string | null = null;
+  paymentMessage = '';
 
   ngOnInit() {
     this.loadTrips();
+    this.loadPaymentReports();
   }
 
   loadTrips() {
@@ -148,6 +200,40 @@ export class AdminTripsComponent implements OnInit {
       error: () => {
         this.error = 'Error al obtener la lista de viajes.';
         this.loading = false;
+      },
+    });
+  }
+
+  loadPaymentReports() {
+    this.paymentReportsLoading = true;
+    this.adminService.getReportedPayments().subscribe({
+      next: (reports) => {
+        this.reportedPayments = reports;
+        this.paymentReportsLoading = false;
+      },
+      error: () => {
+        this.error = 'No se pudieron cargar los reportes de pago.';
+        this.paymentReportsLoading = false;
+      },
+    });
+  }
+
+  resolvePayment(report: Trip, action: 'paid' | 'dismissed') {
+    if (this.resolvingPaymentId) return;
+    this.resolvingPaymentId = report.id;
+    this.error = '';
+    this.paymentMessage = '';
+    this.adminService.resolvePaymentReport(report.id, action).subscribe({
+      next: () => {
+        this.reportedPayments = this.reportedPayments.filter((item) => item.id !== report.id);
+        this.paymentMessage = action === 'paid'
+          ? 'Pago marcado como pagado tras la revisión.'
+          : 'Reporte descartado; el pago volvió a quedar pendiente.';
+        this.resolvingPaymentId = null;
+      },
+      error: (error) => {
+        this.error = error.error?.message || 'No se pudo resolver el reporte de pago.';
+        this.resolvingPaymentId = null;
       },
     });
   }

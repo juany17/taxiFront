@@ -116,12 +116,32 @@ export function shouldApplyPassengerTripStatus(current: Trip['status'], incoming
                   }
                 </div>
               }
+              <div class="trip-modal-payment">
+                <strong>Pago: {{ trackedTrip()!.payment_method === 'mercadopago' ? 'Mercado Pago' : 'Efectivo' }}</strong>
+                <span>Total acordado: \${{ trackedTrip()!.fare }}</span>
+                @if (trackedTrip()!.payment_method === 'mercadopago' && trackedTrip()!.driver_payment_alias) {
+                  <span>Alias del conductor: <strong>{{ trackedTrip()!.driver_payment_alias }}</strong></span>
+                  <small>El pago seguirá pendiente hasta que el conductor confirme la recepción.</small>
+                } @else if (trackedTrip()!.payment_method === 'efectivo' && trackedTrip()!.cash_tendered) {
+                  <span>Pagarás con \${{ trackedTrip()!.cash_tendered }} · Vuelto estimado: \${{ estimatedChange() }}</span>
+                }
+                @if (trackedTrip()!.status === 'finalizado') {
+                  <span>Estado del pago: {{ paymentStatusLabel() }}</span>
+                  @if (trackedTrip()!.payment_status === 'reportado') {
+                    <small>Problema reportado: {{ trackedTrip()!.payment_issue }}</small>
+                  }
+                }
+              </div>
               <button type="button" class="btn btn-primary trip-modal-button" (click)="closeStatusDialog()">Entendido</button>
             } @else {
               <button type="button" class="trip-modal-close" (click)="dismissReviewDialog()" aria-label="Omitir calificación">&times;</button>
               <div class="trip-modal-icon trip-modal-icon-review"><i class="fa-solid fa-star"></i></div>
               <h2 id="passenger-trip-modal-title">¿Cómo fue tu viaje?</h2>
               <p>Tu viaje finalizó. Califica a {{ trackedTrip()!.driver?.nombre || 'tu conductor' }} y déjanos tu opinión.</p>
+              <div class="trip-modal-payment">
+                <strong>Pago: {{ trackedTrip()!.payment_method === 'mercadopago' ? 'Mercado Pago' : 'Efectivo' }}</strong>
+                <span>Total: \${{ trackedTrip()!.fare }} · Estado: {{ paymentStatusLabel() }}</span>
+              </div>
               <app-feedback-form [tripId]="trackedTrip()!.id" [reviewOnly]="true" (submitted)="onReviewSubmitted()"></app-feedback-form>
               <button type="button" class="trip-modal-skip" (click)="dismissReviewDialog()">Omitir por ahora</button>
             }
@@ -140,6 +160,8 @@ export function shouldApplyPassengerTripStatus(current: Trip['status'], incoming
     .trip-modal-icon-accepted { background: rgba(16, 185, 129, 0.16); color: #6EE7B7; }
     .trip-modal-icon-review { background: rgba(245, 158, 11, 0.18); color: #FBBF24; }
     .trip-modal-route, .trip-modal-driver { display: grid; gap: 0.6rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--glass-border); border-radius: 0.75rem; background: rgba(255, 255, 255, 0.04); text-align: left; overflow-wrap: anywhere; }
+    .trip-modal-payment { display: grid; gap: 0.35rem; margin: 1rem 0; padding: 0.9rem; border: 1px solid rgba(16,185,129,0.25); border-radius: 0.75rem; background: rgba(16,185,129,0.07); text-align: left; overflow-wrap: anywhere; }
+    .trip-modal-payment small { color: var(--text-muted); }
     .trip-modal-progress { height: 4px; margin-top: 1.5rem; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
     .trip-modal-progress span { display: block; width: 35%; height: 100%; border-radius: inherit; background: var(--primary); animation: searchProgress 1.5s ease-in-out infinite; }
     .trip-modal-button { width: 100%; }
@@ -166,6 +188,13 @@ export class PassengerHomeComponent implements OnInit, OnDestroy {
       this.socketService.onTripStatusChanged().subscribe((updatedTrip) => {
         if (updatedTrip.id !== this.trackedTripId) return;
         this.applyTrackedTripUpdate(updatedTrip);
+      }),
+    );
+    this.subscriptions.add(
+      this.socketService.onTripPaymentChanged().subscribe((paymentUpdate) => {
+        if (paymentUpdate.id !== this.trackedTripId) return;
+        const current = this.trackedTrip();
+        if (current) this.trackedTrip.set({ ...current, ...paymentUpdate });
       }),
     );
 
@@ -218,6 +247,19 @@ export class PassengerHomeComponent implements OnInit, OnDestroy {
     const updated = current ? { ...current, ...incoming } : incoming;
     this.trackedTrip.set(updated);
     this.tripDialogState.set(getPassengerTripDialogState(updated.status));
+  }
+
+  paymentStatusLabel(): string {
+    switch (this.trackedTrip()?.payment_status) {
+      case 'pagado': return 'Pagado';
+      case 'reportado': return 'Reportado';
+      default: return 'Pendiente de confirmación';
+    }
+  }
+
+  estimatedChange(): number {
+    const trip = this.trackedTrip();
+    return Math.max(0, Number(trip?.cash_tendered ?? 0) - Number(trip?.fare ?? 0));
   }
 
   logout() {

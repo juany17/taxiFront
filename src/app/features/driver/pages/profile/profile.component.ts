@@ -188,6 +188,15 @@ import { getDriverAvatarSource } from '../../../../core/utils/driver-avatar.util
               </div>
 
               <div class="form-group mb-3">
+                <label>Alias de Mercado Pago</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-wallet input-icon"></i>
+                  <input class="form-control" [(ngModel)]="profileData.mercadoPagoAlias" name="mercadoPagoAlias"
+                         maxlength="100" placeholder="Tu alias (solo se muestra a pasajeros de viajes aceptados)">
+                </div>
+              </div>
+
+              <div class="form-group mb-3">
                 <label>Frase personal</label>
                 <div class="input-wrapper">
                   <i class="fa-solid fa-quote-left input-icon"></i>
@@ -483,6 +492,7 @@ export class DriverProfileComponent implements OnInit {
   data: any = { placa: '', marca: '', modelo: '', color: '' };
   profileData: any = {
     fotoPerfil: '',
+    mercadoPagoAlias: '',
     descripcion: '',
     anosExperiencia: 0,
     edad: null,
@@ -503,6 +513,7 @@ export class DriverProfileComponent implements OnInit {
   success = false;
   saving = false;
   profileSaving = false;
+  private paymentAliasLoaded = false;
   profileError = '';
   selectedFile: File | null = null;
   previewUrl: string | null = null;
@@ -653,6 +664,20 @@ export class DriverProfileComponent implements OnInit {
       this.previewUrl = user.fotoPerfil || null;
       this.generatedAvatarUrl = getDriverAvatarSource(user);
       this.originalProfileData.set(this.getComparableData({ ...this.profileData }));
+      this.auth.getPaymentAlias().subscribe({
+        next: ({ mercadoPagoAlias }) => {
+          this.profileData.mercadoPagoAlias = mercadoPagoAlias || '';
+          const original = this.originalProfileData();
+          this.originalProfileData.set({
+            ...original,
+            mercadoPagoAlias: this.profileData.mercadoPagoAlias,
+          });
+          this.paymentAliasLoaded = true;
+        },
+        error: () => {
+          this.profileError = 'No se pudo cargar tu alias de Mercado Pago.';
+        },
+      });
     }
   }
 
@@ -691,7 +716,8 @@ export class DriverProfileComponent implements OnInit {
       horariosTrabajo: this.profileData.horariosTrabajo,
       zonasPreferencia: this.toStringArray(this.profileData.zonasPreferencia),
       accesoriosVehiculo: this.toStringArray(this.profileData.accesoriosVehiculo),
-      redesSociales: this.profileData.redesSociales
+      redesSociales: this.profileData.redesSociales,
+      ...(this.paymentAliasLoaded ? { mercadoPagoAlias: this.profileData.mercadoPagoAlias } : {}),
     };
 
     if (this.selectedFile) {

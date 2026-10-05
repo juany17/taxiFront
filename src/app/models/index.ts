@@ -5,6 +5,7 @@ export interface User {
   telefono: string;
   rol: 'pasajero' | 'conductor' | 'admin';
   fotoPerfil?: string;
+  mercadoPagoAlias?: string | null;
   descripcion?: string;
   
   // Información Profesional
@@ -73,8 +74,20 @@ export interface Trip {
   vehicle_id: string | null;
   status: 'pendiente' | 'aceptado' | 'finalizado';
   fare: number;
+  payment_method: 'efectivo' | 'mercadopago';
+  cash_tendered?: number | string | null;
+  payment_status: 'pendiente' | 'pagado' | 'reportado';
+  payment_issue?: string | null;
+  payment_reviewed_at?: string | Date | null;
+  payment_reviewed_by?: string | null;
+  payment_review_action?: 'paid' | 'dismissed' | null;
+  driver_payment_alias?: string | null;
   origin_address: string | null;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
   destination_address: string | null;
+  destination_lat?: number | null;
+  destination_lng?: number | null;
   requested_at?: string | Date | null;
   accepted_at?: string | Date | null;
   finished_at?: string | Date | null;
@@ -91,6 +104,8 @@ export interface CreateTripRequest {
   destination_address: string;
   destination_lat: number;
   destination_lng: number;
+  payment_method?: 'efectivo' | 'mercadopago';
+  cash_tendered?: number | null;
   vehicle_id?: string;
 }
 

@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { AuthResponse, User, LoginResponse } from '../../models';
 
-export type ProfileUpdate = Partial<Pick<User, 'fotoPerfil' | 'descripcion' | 'anosExperiencia' | 'edad' | 'idiomas' | 'pasatiempos' | 'frasePersonal' | 'musicaPreferida' | 'aceptaMascotas' | 'tieneCascoExtra' | 'estiloConduccion' | 'ofreceChucherias' | 'horariosTrabajo' | 'zonasPreferencia' | 'accesoriosVehiculo' | 'redesSociales'>>;
+export type ProfileUpdate = Partial<Pick<User, 'fotoPerfil' | 'mercadoPagoAlias' | 'descripcion' | 'anosExperiencia' | 'edad' | 'idiomas' | 'pasatiempos' | 'frasePersonal' | 'musicaPreferida' | 'aceptaMascotas' | 'tieneCascoExtra' | 'estiloConduccion' | 'ofreceChucherias' | 'horariosTrabajo' | 'zonasPreferencia' | 'accesoriosVehiculo' | 'redesSociales'>>;
 
 @Injectable({
   providedIn: 'root'
@@ -63,6 +63,10 @@ export class AuthService {
     return this.http.patch<User>(`${environment.apiUrl}/auth/profile`, data, {
       headers: new HttpHeaders({ Authorization: `Bearer ${this.token()}` }),
     });
+  }
+
+  getPaymentAlias() {
+    return this.http.get<{ mercadoPagoAlias: string | null }>(`${environment.apiUrl}/auth/payment-alias`);
   }
 
   forgotPassword(email: string) {

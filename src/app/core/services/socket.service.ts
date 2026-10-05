@@ -31,6 +31,14 @@ export class SocketService {
     this.socket.emit('joinTrip', { tripId });
   }
 
+  emitPassengerLocation(tripId: string, position: { lat: number; lng: number }) {
+    this.socket.emit('passengerLocationUpdated', {
+      tripId,
+      lat: position.lat,
+      lng: position.lng,
+    });
+  }
+
   onTripStatusChanged(): Observable<Trip> {
     return new Observable((observer) => {
       this.socket.on('tripStatusChanged', (data: Trip) => {
@@ -50,6 +58,26 @@ export class SocketService {
   onTripUpdated(): Observable<Trip> {
     return new Observable((observer) => {
       this.socket.on('tripUpdated', (data: Trip) => {
+        observer.next(data);
+      });
+    });
+  }
+
+  onTripPaymentChanged(): Observable<Pick<Trip, 'id' | 'payment_status' | 'payment_issue'>> {
+    return new Observable((observer) => {
+      this.socket.on('tripPaymentChanged', (data: { tripId: string; payment_status: Trip['payment_status']; payment_issue: string | null }) => {
+        observer.next({
+          id: data.tripId,
+          payment_status: data.payment_status,
+          payment_issue: data.payment_issue,
+        });
+      });
+    });
+  }
+
+  onPassengerLocationUpdated(): Observable<{ tripId: string; lat: number; lng: number; passengerId: string; updatedAt: string }> {
+    return new Observable((observer) => {
+      this.socket.on('passengerLocationUpdated', (data: { tripId: string; lat: number; lng: number; passengerId: string; updatedAt: string }) => {
         observer.next(data);
       });
     });

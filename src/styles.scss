@@ -4,6 +4,7 @@
 
 /* ---- Google Fonts ---- */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import 'leaflet/dist/leaflet.css';
 
 /* ---- CSS Variables ---- */
 :root, [data-bs-theme="dark"] {
@@ -92,6 +93,132 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #0f172a;
+  border-radius: 1rem;
+  z-index: 1;
+}
+
+.map-pin-wrapper {
+  background: transparent;
+  border: none;
+}
+
+.map-pin {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--pin-color, #7C3AED);
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.38);
+}
+
+.map-pin::after {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pin-color, #7C3AED) 25%, transparent);
+  z-index: -1;
+}
+
+.trip-map-wrapper {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  padding: 0.75rem;
+}
+
+.trip-map-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.trip-map {
+  width: 100%;
+  height: 320px;
+  min-height: 320px;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(124,58,237,0.1), rgba(15,23,42,0.2));
+}
+
+.trip-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.trip-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+@media (max-width: 767.98px) {
+  .main-content {
+    padding: 1rem 0.75rem 1.5rem;
+  }
+
+  .glass-panel, .card {
+    border-radius: 1rem;
+    padding: 1rem 0.9rem;
+  }
+
+  .trip-map {
+    height: 260px;
+    min-height: 260px;
+  }
+
+  .trip-map-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .trip-map-actions .btn {
+    width: 100%;
+  }
+
+  .navbar {
+    padding: 0.7rem 0.75rem;
+  }
+
+  .navbar-container {
+    gap: 0.5rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .passenger-nav-links {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  .passenger-nav-label {
+    display: none;
+  }
+
+  .nav-link {
+    flex: 1;
+    justify-content: center;
+  }
 }
 
 a { color: var(--primary); text-decoration: none; transition: var(--transition); }

@@ -1,5 +1,7 @@
+import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, signal, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { TripService } from '../../../../core/services/trip.service';
 import { SocketService } from '../../../../core/services/socket.service';
@@ -9,7 +11,7 @@ import { FeedbackFormComponent } from '../../../feedback/feedback-form.component
 @Component({
   selector: 'app-passenger-trips',
   standalone: true,
-  imports: [RouterLink, FeedbackFormComponent],
+  imports: [RouterLink, FeedbackFormComponent, CommonModule, FormsModule],
   template: `
     <div class="app-container fade-in-up">
       <nav class="navbar passenger-page-navbar">
@@ -30,11 +32,16 @@ import { FeedbackFormComponent } from '../../../feedback/feedback-form.component
       </nav>
 
       <main class="main-content">
-        <div class="mb-4" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="mb-4" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
           <h2 class="title mb-0">Mis Viajes</h2>
-          <a routerLink="/passenger/request-trip" class="btn btn-primary" style="width: auto;">
-            <i class="fa-solid fa-plus"></i> Nuevo Viaje
-          </a>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline" (click)="clearHistory()" *ngIf="trips().length > 0">
+              <i class="fa-solid fa-trash"></i> Limpiar historial
+            </button>
+            <a routerLink="/passenger/request-trip" class="btn btn-primary" style="width: auto;">
+              <i class="fa-solid fa-plus"></i> Nuevo Viaje
+            </a>
+          </div>
         </div>
 
         @if (liveNotification) {
@@ -89,6 +96,55 @@ import { FeedbackFormComponent } from '../../../feedback/feedback-form.component
                   </div>
                 }
 
+                @if (trip.status !== 'pendiente') {
+                  <div class="trip-payment-info">
+                    <div class="trip-payment-heading">
+                      <strong><i class="fa-solid fa-wallet"></i> Pago</strong>
+                      <span class="badge"
+                        [class]="trip.payment_status === 'pagado' ? 'badge-completed' : trip.payment_status === 'reportado' ? 'badge-pending' : 'badge-accepted'">
+                        {{ getPaymentStatusLabel(trip.payment_status) }}
+                      </span>
+                    </div>
+                    <p>
+                      {{ trip.payment_method === 'mercadopago' ? 'Mercado Pago' : 'Efectivo' }}
+                      · Importe acordado: \${{ trip.fare }}
+                    </p>
+                    @if (trip.payment_method === 'mercadopago' && trip.driver_payment_alias) {
+                      <div class="payment-alias">
+                        <small>Alias del conductor</small>
+                        <strong>{{ trip.driver_payment_alias }}</strong>
+                        <small>Confirma la transferencia solo después de realizarla.</small>
+                      </div>
+                    } @else if (trip.payment_method === 'mercadopago' && trip.status === 'aceptado') {
+                      <p>El conductor todavía no configuró su alias. Coordina el pago con él.</p>
+                    }
+                    @if (trip.payment_method === 'efectivo' && trip.cash_tendered) {
+                      <p>Entregarás \${{ trip.cash_tendered }} · Vuelto estimado: \${{ getChange(trip) }}</p>
+                    }
+                    @if (trip.payment_status === 'reportado') {
+                      <p>Problema informado: {{ trip.payment_issue }}</p>
+                    }
+                    @if (trip.status === 'finalizado' && trip.payment_status === 'pendiente') {
+                      @if (reportingPaymentTrip() === trip.id) {
+                        <form (ngSubmit)="submitPaymentIssue(trip.id)" class="payment-report-form">
+                          <label [for]="'payment-reason-' + trip.id">Describe el problema con el pago</label>
+                          <textarea class="form-control" [(ngModel)]="paymentIssueReason" [name]="'reason-' + trip.id"
+                            [id]="'payment-reason-' + trip.id" maxlength="500" required></textarea>
+                          @if (paymentError()) { <small class="payment-error">{{ paymentError() }}</small> }
+                          <button class="btn btn-outline" type="submit" [disabled]="paymentSaving() || !paymentIssueReason.trim()">
+                            {{ paymentSaving() ? 'Enviando...' : 'Enviar reporte' }}
+                          </button>
+                          <button class="payment-cancel" type="button" (click)="cancelPaymentReport()">Cancelar</button>
+                        </form>
+                      } @else {
+                        <button type="button" class="btn btn-outline payment-report-button" (click)="startPaymentReport(trip.id)">
+                          <i class="fa-solid fa-flag"></i> Reportar problema con el pago
+                        </button>
+                      }
+                    }
+                  </div>
+                }
+
                 <div class="card-row">
                   <i class="fa-solid fa-location-dot" style="color: var(--primary);"></i>
                   <div>
@@ -137,6 +193,19 @@ import { FeedbackFormComponent } from '../../../feedback/feedback-form.component
     .trip-driver-details { display: flex; flex-wrap: wrap; gap: 0.65rem 1rem; color: var(--text-main); font-size: 0.9rem; }
     .trip-driver-details span { display: inline-flex; align-items: center; gap: 0.35rem; }
     .trip-driver-details i { color: var(--text-muted); }
+    .trip-payment-info { margin: 0.9rem 0; padding: 0.85rem; border: 1px solid rgba(16,185,129,0.24); border-radius: 0.85rem; background: rgba(16,185,129,0.07); }
+    .trip-payment-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .trip-payment-heading strong { color: var(--text-main); }
+    .trip-payment-info p { margin: 0.55rem 0 0; color: var(--text-muted); font-size: 0.86rem; }
+    .payment-alias { display: grid; gap: 0.2rem; margin-top: 0.7rem; padding: 0.7rem; border-radius: 0.7rem; background: rgba(255,255,255,0.06); overflow-wrap: anywhere; }
+    .payment-alias small { color: var(--text-muted); font-size: 0.75rem; }
+    .payment-alias strong { font-size: 1.05rem; color: #6EE7B7; }
+    .payment-report-form { display: grid; gap: 0.55rem; margin-top: 0.75rem; }
+    .payment-report-form label { color: var(--text-muted); font-size: 0.8rem; }
+    .payment-report-form .btn { width: 100%; }
+    .payment-report-button { width: 100%; margin-top: 0.75rem; }
+    .payment-cancel { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+    .payment-error { color: #FCA5A5; }
     .review-modal-backdrop { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); }
     .review-modal { position: relative; width: min(100%, 560px); max-height: 90vh; overflow-y: auto; padding: 2rem; text-align: center; background: #1A1730; border: 1px solid var(--glass-border); border-radius: 1.25rem; box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6); color: var(--text-main); }
     .review-modal .title { margin-bottom: 0.5rem; color: #FFFFFF; }
@@ -156,6 +225,10 @@ export class PassengerTripsComponent implements OnInit, OnDestroy {
   trips = signal<Trip[]>([]);
   liveNotification = '';
   reviewPromptTrip = signal<Trip | null>(null);
+  reportingPaymentTrip = signal<string | null>(null);
+  paymentSaving = signal(false);
+  paymentError = signal('');
+  paymentIssueReason = '';
   private subs: Subscription[] = [];
 
   ngOnInit() {
@@ -173,6 +246,11 @@ export class PassengerTripsComponent implements OnInit, OnDestroy {
           this.reviewPromptTrip.set(updatedTrip);
         }
       })
+    );
+    this.subs.push(
+      this.socketService.onTripPaymentChanged().subscribe((paymentUpdate) => {
+        this.trips.update((list) => list.map((trip) => trip.id === paymentUpdate.id ? { ...trip, ...paymentUpdate } : trip));
+      }),
     );
   }
 
@@ -210,5 +288,52 @@ export class PassengerTripsComponent implements OnInit, OnDestroy {
     if (status === 'aceptado') return 'badge-accepted';
     if (status === 'finalizado') return 'badge-completed';
     return 'badge-pending';
+  }
+
+  getPaymentStatusLabel(status: Trip['payment_status']): string {
+    if (status === 'pagado') return 'Pagado';
+    if (status === 'reportado') return 'Reportado';
+    return 'Pendiente';
+  }
+
+  getChange(trip: Trip): number {
+    return Math.max(0, Number(trip.cash_tendered ?? 0) - Number(trip.fare));
+  }
+
+  startPaymentReport(tripId: string): void {
+    this.paymentIssueReason = '';
+    this.paymentError.set('');
+    this.reportingPaymentTrip.set(tripId);
+  }
+
+  cancelPaymentReport(): void {
+    this.reportingPaymentTrip.set(null);
+    this.paymentIssueReason = '';
+    this.paymentError.set('');
+  }
+
+  submitPaymentIssue(tripId: string): void {
+    const reason = this.paymentIssueReason.trim();
+    if (!reason || this.paymentSaving()) return;
+
+    this.paymentSaving.set(true);
+    this.paymentError.set('');
+    this.tripService.reportPaymentIssue(tripId, reason).subscribe({
+      next: (updatedTrip) => {
+        this.updateTripInList(updatedTrip);
+        this.cancelPaymentReport();
+        this.paymentSaving.set(false);
+      },
+      error: () => {
+        this.paymentError.set('No se pudo enviar el reporte. Intenta nuevamente.');
+        this.paymentSaving.set(false);
+      },
+    });
+  }
+
+  clearHistory() {
+    this.trips.set([]);
+    this.liveNotification = 'Historial de viajes limpiado.';
+    setTimeout(() => this.liveNotification = '', 3000);
   }
 }
